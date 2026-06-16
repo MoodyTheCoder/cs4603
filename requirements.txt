@@ -2,9 +2,13 @@ openai
 python-dotenv
 langchain
 langchain-openai
+langchain-community
 langgraph
 ipykernel
 tiktoken
 mlflow
 iprogress
 pprintpp
+pypdf
+bs4
+markitdown 

@@ -1,17 +1,42 @@
 """Shared setup helpers for Databricks + OpenAI notebooks."""
 
 from dataclasses import dataclass
-import logging
 import os
 
 from dotenv import load_dotenv
-from pprintpp import pprint
+import pprintpp
+
 from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnableSequence
+from langchain_community.vectorstores import SKLearnVectorStore  
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.output_parsers import StrOutputParser
 
 import openai
 import json
 import warnings
 
+def enable_logging():
+    import logging
+
+    logging.disable(logging.NOTSET)
+
+    # root = logging.getLogger()
+    # root.setLevel(logging.DEBUG)
+    # for h in root.handlers:
+    #     h.setLevel(logging.DEBUG)
+
+    logging.basicConfig(level=logging.DEBUG, force=True) # to show the communication embedding model and the vector store
+
+def disable_logging():
+    import logging
+
+    logging.disable(logging.CRITICAL)
+    
 # This dataclass holds the Databricks configuration loaded from environment variables.
 # The `frozen=True` parameter makes it immutable, which is a good practice for configuration objects.
 @dataclass(frozen=True)
@@ -55,33 +80,32 @@ def get_databricks_config(validate: bool = True) -> DatabricksConfig:
 
 def create_databricks_client(config: DatabricksConfig) -> openai.OpenAI:
     """Create an OpenAI client configured for Databricks model serving endpoints."""
-    return openai.OpenAI(
+    llm = ChatOpenAI(
+        model=config.endpoint,
         api_key=config.token,
         base_url=f"{config.host}/serving-endpoints",
     )
+    llm_noreason = ChatOpenAI(
+        model=config.endpoint,
+        api_key=config.token,
+        base_url=f"{config.host}/serving-endpoints",
+        reasoning_effort="none",
+    )
+    databricks_embeddings = OpenAIEmbeddings(
+        model="databricks-gte-large-en",
+        api_key=config.token,
+        base_url=f"{config.host}/serving-endpoints",
+        check_embedding_ctx_length=False
+    )
 
-def enable_logging():
-    import logging
+    return llm, llm_noreason, databricks_embeddings
 
-    logging.disable(logging.NOTSET)
-
-    # root = logging.getLogger()
-    # root.setLevel(logging.DEBUG)
-    # for h in root.handlers:
-    #     h.setLevel(logging.DEBUG)
-
-    logging.basicConfig(level=logging.DEBUG, force=True) # to show the communication embedding model and the vector store
-
-def disable_logging():
-    import logging
-
-    logging.disable(logging.CRITICAL)
-    
 def bootstrap_notebook(validate: bool = True):
     """Return notebook-ready variables: token, host, endpoint, and configured client."""
     config = get_databricks_config(validate=validate)
-    client = create_databricks_client(config)
-    return config.token, config.host, config.endpoint, client
+    llm, llm_noreason, databricks_embeddings = create_databricks_client(config)
+    
+    return config.token, config.host, config.endpoint, (llm, llm_noreason), databricks_embeddings
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", module="pydantic")
@@ -91,4 +115,4 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    DATABRICKS_TOKEN, DATABRICKS_HOST, DATABRICKS_MODEL, client = bootstrap_notebook()
+    DATABRICKS_TOKEN, DATABRICKS_HOST, DATABRICKS_MODEL, (llm, llm_noreason), databricks_embeddings = bootstrap_notebook()
