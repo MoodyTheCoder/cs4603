@@ -1,0 +1,9 @@
+# Minimal dependencies to run 4.4.mcp_server_db.py over streamable-http.
+# (sqlite3 is part of the Python standard library, so it is not listed here.)
+#
+# The LLM-augmented search_tracks_v2 tool needs extra packages (langchain,
+# langchain-openai, ...) and Databricks credentials; without them that one tool
+# degrades gracefully and returns "(LLM summary unavailable)". The core tool,
+# resources, and prompt work with just the packages below.
+mcp
+uvicorn
